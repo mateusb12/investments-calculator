@@ -23,23 +23,17 @@ A React-based investment calculator application built with Vite and Tailwind CSS
 
 ### Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/mateusb12/investments-calculator.git
-cd investments-calculator
-```
-
-2. Install dependencies:
+1. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Start the development server:
+2. Start the development server:
 ```bash
 npm run dev
 ```
 
-4. Open your browser and navigate to `http://localhost:5173`
+3. Open your browser and navigate to `http://localhost:5173`
 
 ## Available Scripts
 
