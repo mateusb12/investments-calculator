@@ -2,10 +2,13 @@ import { useState } from 'react';
 
 function RentabilityComparisonCalculator() {
     const [amount, setAmount] = useState(10000);
-    const [lciRate, setLciRate] = useState(4.5);
-    const [cdbRate, setCdbRate] = useState(6.0);
-    // O estado 'time' foi removido
-    const [results, setResults] = useState([]); // Agora é um array
+    // NOVO: Taxa base do CDI (ex: 11.25% ao ano)
+    const [cdiRate, setCdiRate] = useState(11.25);
+    // MUDADO: Agora representa a porcentagem SOBRE o CDI (ex: 95% do CDI)
+    const [lciRate, setLciRate] = useState(95);
+    // MUDADO: Agora representa a porcentagem SOBRE o CDI (ex: 110% do CDI)
+    const [cdbRate, setCdbRate] = useState(110);
+    const [results, setResults] = useState([]);
 
     /**
      * Retorna a alíquota de IR com base no número de dias.
@@ -18,35 +21,71 @@ function RentabilityComparisonCalculator() {
         return 0.15; // 15%
     };
 
+    /**
+     * Calcula a data futura com base em um número de dias.
+     * @param {number} daysToAdd
+     * @returns {string} - Data formatada (ex: 07/nov/2025)
+     */
+    const getFutureDate = (daysToAdd) => {
+        const today = new Date(); // Pega a data de hoje
+        const futureDate = new Date(today.getTime()); // Clona a data
+        futureDate.setDate(today.getDate() + daysToAdd); // Adiciona os dias
+
+        const day = futureDate.getDate().toString().padStart(2, '0');
+        // 'short' é a melhor opção para o mês
+        const month = futureDate.toLocaleDateString('pt-BR', { month: 'short' }); // ex: "nov."
+        const year = futureDate.getFullYear();
+
+        // Limpar o ponto do mês (ex: "nov." -> "nov")
+        const cleanMonth = month.replace('.', '');
+
+        return `${day}/${cleanMonth}/${year}`;
+    };
+
     const calculateComparison = () => {
+        // --- LÓGICA DE CÁLCULO ATUALIZADA ---
+        // 1. Calcula as taxas anuais efetivas com base no CDI
+        // Ex: (95 / 100) * 11.25 = 10.6875%
+        const annualLciRate = (lciRate / 100) * cdiRate;
+        // Ex: (110 / 100) * 11.25 = 12.375%
+        const annualCdbRate = (cdbRate / 100) * cdiRate;
+        // ------------------------------------
+
         const newResults = [];
 
-        // Define os períodos de simulação em dias
-        const periods = [
-            { label: "6 meses (180 dias)", days: 180 },
-            { label: "1 ano (360 dias)", days: 360 },
-            { label: "2 anos (720 dias)", days: 720 },
-            { label: "3 anos (1080 dias)", days: 1080 } // Exemplo da última faixa
+        // Períodos base (label e dias)
+        const basePeriods = [
+            { label: "6 meses", days: 180 },
+            { label: "1 ano", days: 360 },
+            { label: "2 anos", days: 720 },
+            { label: "3 anos", days: 1080 }
         ];
 
+        // Mapeia os períodos para incluir a data formatada
+        const periods = basePeriods.map(p => {
+            const futureDateStr = getFutureDate(p.days);
+            return {
+                ...p,
+                // Novo formato: "6 meses (13/mar/2026)"
+                formattedLabel: `${p.label} (${futureDateStr})`
+            };
+        });
+
         for (const period of periods) {
-            // Converte dias para uma fração do ano para o cálculo da taxa
             const years = period.days / 365.0;
 
             // 1. LCI/LCA (Isento de IR)
-            // Usando a mesma lógica de juros simples do seu cálculo original
-            const lciReturn = amount * (1 + (lciRate / 100) * years);
+            // Usa a nova 'annualLciRate' calculada
+            const lciReturn = amount * (1 + (annualLciRate / 100) * years);
             const lciProfit = lciReturn - amount;
 
             // 2. CDB (Com IR)
-            const cdbGrossReturn = amount * (1 + (cdbRate / 100) * years);
+            // Usa a nova 'annualCdbRate' calculada
+            const cdbGrossReturn = amount * (1 + (annualCdbRate / 100) * years);
             const cdbGrossProfit = cdbGrossReturn - amount;
 
-            // Calcula o imposto
             const taxRate = getCdbTaxRate(period.days);
             const taxPaid = cdbGrossProfit * taxRate;
-
-            // Calcula o lucro líquido e o total líquido
             const cdbNetProfit = cdbGrossProfit - taxPaid;
             const cdbNetReturn = amount + cdbNetProfit;
 
@@ -55,7 +94,8 @@ function RentabilityComparisonCalculator() {
             const betterOption = cdbNetReturn > lciReturn ? 'CDB' : 'LCI/LCAs';
 
             newResults.push({
-                periodLabel: period.label,
+                // USA A LABEL FORMATADA AQUI
+                periodLabel: period.formattedLabel,
                 taxRate: (taxRate * 100).toFixed(1) + '%',
                 lci: {
                     total: lciReturn.toFixed(2),
@@ -95,9 +135,27 @@ function RentabilityComparisonCalculator() {
                         />
                     </div>
 
+                    {/* --- NOVO INPUT DO CDI --- */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Taxa Anual LCI/LCAs (%)
+                            Taxa CDI Anual (%)
+                        </label>
+                        <input
+                            type="number"
+                            value={cdiRate}
+                            onChange={(e) => setCdiRate(Number(e.target.value))}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                            min="0"
+                            step="0.1"
+                        />
+                    </div>
+                    {/* ------------------------- */}
+
+
+                    {/* --- INPUT LCI MODIFICADO --- */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            LCI/LCAs (% do CDI)
                         </label>
                         <input
                             type="number"
@@ -108,10 +166,13 @@ function RentabilityComparisonCalculator() {
                             step="0.1"
                         />
                     </div>
+                    {/* --------------------------- */}
 
+
+                    {/* --- INPUT CDB MODIFICADO --- */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Taxa Anual CDB (%)
+                            CDB (% do CDI)
                         </label>
                         <input
                             type="number"
@@ -122,8 +183,7 @@ function RentabilityComparisonCalculator() {
                             step="0.1"
                         />
                     </div>
-
-                    {/* Input de Prazo foi removido */}
+                    {/* --------------------------- */}
 
                     <button
                         onClick={calculateComparison}
@@ -134,7 +194,7 @@ function RentabilityComparisonCalculator() {
                 </div>
             </div>
 
-            {/* Nova seção de resultados em loop */}
+            {/* A seção de resultados não precisa de NENHUMA alteração, pois ela já lê do estado 'results' */}
             {results.length > 0 && (
                 <div className="mt-8 max-w-2xl space-y-6">
                     <h3 className="text-2xl font-bold text-gray-800">Resultados da Simulação</h3>
