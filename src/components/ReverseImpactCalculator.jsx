@@ -35,14 +35,15 @@ function ReverseImpactCalculator() {
     const [result, setResult] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [history, setHistory] = useState([]); // <-- NOVO ESTADO PARA O HISTÓRICO
 
     const calculateTimeToImpact = useCallback(() => {
         setIsLoading(true);
         setResult(null);
         setError(null);
+        setHistory([]); // <-- LIMPA O HISTÓRICO ANTIGO
 
         // --- Inicia a simulação ---
-        // Precisamos rodar a simulação em "worker" (setTimeout) para o UI atualizar
         setTimeout(() => {
             try {
                 // 1. Calcular taxas mensais efetivas
@@ -59,11 +60,22 @@ function ReverseImpactCalculator() {
                 let cdbPrincipal = initialCapital; // Total de dinheiro "colocado" no CDB
 
                 let netDifference = 0;
-                const maxMonths = 12 * 30; // Limite de 30 anos para evitar loop infinito
+                const maxMonths = 12 * 30; // Limite de 30 anos
+
+                // Variáveis para o histórico
+                let simulationHistory = [];
+                const startDate = new Date();
 
                 // 3. Loop de simulação (mês a mês)
                 while (netDifference < targetImpact && months < maxMonths) {
-                    // Aporte é feito no início do mês
+
+                    const lciMonthStart = lciValue;
+                    const cdbMonthStart = cdbGrossValue;
+
+                    // Define o aporte do mês (se for mês 0, é o capital inicial, senão é o aporte mensal)
+                    const currentContribution = (months === 0) ? initialCapital : monthlyContribution;
+
+                    // Aporte é feito no início do mês (SE não for o primeiro mês)
                     if (months > 0) {
                         lciValue += monthlyContribution;
                         cdbGrossValue += monthlyContribution;
@@ -71,8 +83,15 @@ function ReverseImpactCalculator() {
                     }
 
                     // Rentabilidade do mês é aplicada sobre o valor atual
+                    // Precisamos guardar o valor *antes* de aplicar os juros para calcular o rendimento
+                    const lciValueBeforeInterest = lciValue;
+                    const cdbValueBeforeInterest = cdbGrossValue;
+
                     lciValue *= (1 + monthlyLciRate);
                     cdbGrossValue *= (1 + monthlyCdbRate);
+
+                    const lciMonthlyProfit = lciValue - lciValueBeforeInterest;
+                    const cdbMonthlyProfit = cdbGrossValue - cdbValueBeforeInterest;
 
                     months++;
 
@@ -87,11 +106,30 @@ function ReverseImpactCalculator() {
 
                     // 5. Verificar o "impacto" (diferença)
                     netDifference = Math.abs(lciNetValue - cdbNetValue);
+
+                    // --- 6. ADICIONA AO HISTÓRICO ---
+                    const currentDate = new Date(startDate);
+                    currentDate.setMonth(startDate.getMonth() + months - 1);
+                    const monthYear = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' }).format(currentDate);
+
+                    simulationHistory.push({
+                        month: months,
+                        monthYear: monthYear,
+                        contribution: currentContribution,
+                        lciStart: lciMonthStart,
+                        lciProfit: lciMonthlyProfit,
+                        lciEnd: lciNetValue,
+                        cdbStart: cdbMonthStart,
+                        cdbProfit: cdbMonthlyProfit,
+                        cdbNetEnd: cdbNetValue,
+                        netDifference: netDifference,
+                    });
                 }
 
-                // 6. Fim do loop, verificar o resultado
+                // 7. Fim do loop, verificar o resultado
                 if (months >= maxMonths && netDifference < targetImpact) {
                     setError(`O impacto de ${formatCurrency(targetImpact)} não foi atingido em 30 anos. A diferença máxima atingida foi de ${formatCurrency(netDifference)}.`);
+                    setHistory([]); // Limpa histórico em caso de erro
                 } else {
                     // Sucesso!
                     const years = Math.floor(months / 12);
@@ -111,15 +149,18 @@ function ReverseImpactCalculator() {
                         finalCdbNetValue,
                         finalDifference: netDifference,
                     });
+
+                    setHistory(simulationHistory); // <-- SALVA O HISTÓRICO NO ESTADO
                 }
 
             } catch (e) {
                 console.error(e);
                 setError("Ocorreu um erro no cálculo. Verifique se as taxas são válidas.");
+                setHistory([]); // Limpa histórico em caso de erro
             } finally {
                 setIsLoading(false);
             }
-        }, 50); // 50ms para permitir a renderização do 'loading'
+        }, 50);
     }, [targetImpact, initialCapital, monthlyContribution, cdiRate, lciRatePercent, cdbRatePercent]);
 
     return (
@@ -130,7 +171,9 @@ function ReverseImpactCalculator() {
                 atinja um valor específico (seu "impacto" desejado).
             </p>
 
+            {/* --- Formulário de Inputs --- */}
             <div className="border border-gray-500 bg-white rounded-lg shadow-md p-6 max-w-2xl">
+                {/* ... (O conteúdo do formulário permanece o mesmo) ... */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Coluna 1: Cenário */}
                     <div>
@@ -224,7 +267,7 @@ function ReverseImpactCalculator() {
                 </button>
             </div>
 
-            {/* --- Seção de Resultados --- */}
+            {/* --- Seção de Loading --- */}
             {isLoading && (
                 <div className="mt-8 text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -232,6 +275,7 @@ function ReverseImpactCalculator() {
                 </div>
             )}
 
+            {/* --- Seção de Erro --- */}
             {error && (
                 <div className="mt-8 max-w-2xl p-6 bg-red-50 border border-red-300 rounded-lg shadow-md">
                     <h3 className="text-2xl font-bold text-red-800 mb-3">Erro na Simulação</h3>
@@ -239,6 +283,7 @@ function ReverseImpactCalculator() {
                 </div>
             )}
 
+            {/* --- Seção de Resultados --- */}
             {result && !isLoading && (
                 <div className="mt-8 max-w-2xl p-6 bg-green-50 border-2 border-green-300 rounded-lg shadow-lg">
                     <h3 className="text-2xl font-bold text-green-800 mb-4">Simulação Concluída!</h3>
@@ -270,6 +315,65 @@ function ReverseImpactCalculator() {
                     </div>
                 </div>
             )}
+
+            {/* --- INÍCIO DA NOVA SEÇÃO: DETALHES DA SIMULAÇÃO --- */}
+            {history.length > 0 && !isLoading && (
+                <div className="mt-10 max-w-7xl mx-auto">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-4">Detalhes da Simulação (Mês a Mês)</h3>
+                    <div className="overflow-x-auto shadow-md rounded-lg">
+                        <table className="w-full text-sm text-left text-gray-700">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-100">
+                            <tr>
+                                <th scope="col" className="px-4 py-3">Mês</th>
+                                <th scope="col" className="px-4 py-3">Aporte</th>
+                                <th scope="col" className="px-4 py-3 bg-green-50">LCI Início</th>
+                                <th scope="col" className="px-4 py-3 bg-green-50">LCI Rend.</th>
+                                <th scope="col" className="px-4 py-3 bg-green-50">LCI Fim</th>
+                                <th scope="col" className="px-4 py-3 bg-purple-50">CDB Início</th>
+                                <th scope="col" className="px-4 py-3 bg-purple-50">CDB Rend.</th>
+                                <th scope="col" className="px-4 py-3 bg-purple-50">CDB Fim (Líq)</th>
+                                <th scope="col" className="px-4 py-3 bg-blue-50">Diferença</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {history.map((row) => (
+                                <tr key={row.month} className="bg-white border-b hover:bg-gray-50">
+                                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                                        {row.month} ({row.monthYear})
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600">
+                                        {formatCurrency(row.contribution)}
+                                    </td>
+                                    <td className="px-4 py-3 bg-green-50">
+                                        {formatCurrency(row.lciStart)}
+                                    </td>
+                                    <td className="px-4 py-3 text-green-700 bg-green-50">
+                                        +{formatCurrency(row.lciProfit)}
+                                    </td>
+                                    <td className="px-4 py-3 font-semibold text-green-800 bg-green-50">
+                                        {formatCurrency(row.lciEnd)}
+                                    </td>
+                                    <td className="px-4 py-3 bg-purple-50">
+                                        {formatCurrency(row.cdbStart)}
+                                    </td>
+                                    <td className="px-4 py-3 text-purple-700 bg-purple-50">
+                                        +{formatCurrency(row.cdbProfit)}
+                                    </td>
+                                    <td className="px-4 py-3 font-semibold text-purple-800 bg-purple-50">
+                                        {formatCurrency(row.cdbNetEnd)}
+                                    </td>
+                                    <td className="px-4 py-3 font-semibold text-blue-800 bg-blue-50">
+                                        {formatCurrency(row.netDifference)}
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+            {/* --- FIM DA NOVA SEÇÃO --- */}
+
         </div>
     );
 }
