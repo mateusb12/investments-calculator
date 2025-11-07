@@ -4,15 +4,16 @@ import { useState } from 'react';
 import CompoundInterestCalculator from './CompoundInterestCalculator';
 import RentabilityComparisonCalculator from './RentabilityComparisonCalculator';
 import ReverseImpactCalculator from "./ReverseImpactCalculator.jsx";
+import FiiHistoricalChecker from "./FiiHistoricalChecker.jsx";
 
 // 2. This is now the SINGLE SOURCE OF TRUTH
 // We've added a 'component' key to hold the actual component
 const menuItems = [
     {
-        id: 'compound-interest',
-        label: 'Calculadora de Juros Compostos',
-        icon: '📊',
-        component: CompoundInterestCalculator
+        id: 'fii-historical-checker',
+        label: 'Histórico de FIIs (HG Brasil)',
+        icon: '🏠',
+        component: FiiHistoricalChecker
     },
     {
         id: 'rentability-comparison',
