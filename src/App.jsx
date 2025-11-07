@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Sidebar from './components/Sidebar'
 import CompoundInterestCalculator from './components/CompoundInterestCalculator'
 import RentabilityComparisonCalculator from './components/RentabilityComparisonCalculator'
+import ReverseImpactCalculator from "./components/ReverseImpactCalculator.jsx";
 
 function App() {
   const [activeCalculator, setActiveCalculator] = useState('compound-interest')
@@ -12,6 +13,8 @@ function App() {
         return <CompoundInterestCalculator />
       case 'rentability-comparison':
         return <RentabilityComparisonCalculator />
+        case 'reverse-impact':
+            return <ReverseImpactCalculator/>
       default:
         return <CompoundInterestCalculator />
     }

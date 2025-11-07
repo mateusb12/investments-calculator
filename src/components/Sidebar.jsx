@@ -5,7 +5,8 @@ function Sidebar({ onSelectCalculator }) {
 
     const menuItems = [
         { id: 'compound-interest', label: 'Calculadora de Juros Compostos', icon: '📊' },
-        { id: 'rentability-comparison', label: 'Comparação de Rentabilidade (LCI/LCAs vs CDB)', icon: '💰' }
+        { id: 'rentability-comparison', label: 'Comparação de Rentabilidade (LCI/LCAs vs CDB)', icon: '💰' },
+        { id: 'reverse-impact', label: 'Calculadora de Impacto Reverso', icon: '⏱️' }
     ];
 
     const handleItemClick = (itemId) => {
