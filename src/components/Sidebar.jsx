@@ -1,17 +1,46 @@
 import { useState } from 'react';
 
+// 1. Import all your calculator components HERE
+import CompoundInterestCalculator from './CompoundInterestCalculator';
+import RentabilityComparisonCalculator from './RentabilityComparisonCalculator';
+import ReverseImpactCalculator from "./ReverseImpactCalculator.jsx";
+
+// 2. This is now the SINGLE SOURCE OF TRUTH
+// We've added a 'component' key to hold the actual component
+const menuItems = [
+    {
+        id: 'compound-interest',
+        label: 'Calculadora de Juros Compostos',
+        icon: '📊',
+        component: CompoundInterestCalculator
+    },
+    {
+        id: 'rentability-comparison',
+        label: 'Comparação de Rentabilidade (LCI/LCAs vs CDB)',
+        icon: '💰',
+        component: RentabilityComparisonCalculator
+    },
+    {
+        id: 'reverse-impact',
+        label: 'Calculadora de Impacto Reverso',
+        icon: '⏱️',
+        component: ReverseImpactCalculator
+    }
+];
+
+// 3. Export the default calculator for App.jsx to use
+export const defaultCalculator = menuItems[0];
+
+
+// 4. The Sidebar component
 function Sidebar({ onSelectCalculator }) {
-    const [activeItem, setActiveItem] = useState('compound-interest');
+    // Set the initial active item from our default export
+    const [activeItem, setActiveItem] = useState(defaultCalculator.id);
 
-    const menuItems = [
-        { id: 'compound-interest', label: 'Calculadora de Juros Compostos', icon: '📊' },
-        { id: 'rentability-comparison', label: 'Comparação de Rentabilidade (LCI/LCAs vs CDB)', icon: '💰' },
-        { id: 'reverse-impact', label: 'Calculadora de Impacto Reverso', icon: '⏱️' }
-    ];
-
-    const handleItemClick = (itemId) => {
-        setActiveItem(itemId);
-        onSelectCalculator(itemId);
+    const handleItemClick = (item) => {
+        setActiveItem(item.id);
+        // 5. Pass the ENTIRE component up to App.jsx, not just a string ID
+        onSelectCalculator(() => item.component);
     };
 
     return (
@@ -25,7 +54,8 @@ function Sidebar({ onSelectCalculator }) {
                     {menuItems.map((item) => (
                         <li key={item.id}>
                             <button
-                                onClick={() => handleItemClick(item.id)}
+                                // Pass the whole item object
+                                onClick={() => handleItemClick(item)}
                                 className={`w-full text-left px-4 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-3 ${
                                     activeItem === item.id
                                         ? 'bg-blue-600 hover:bg-blue-700'
