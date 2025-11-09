@@ -7,4 +7,5 @@ export default defineConfig({
         react(),
         // ⛔️ And remove this line: tailwindcss(),
     ],
+    base: '/investments-calculator/',
 })
