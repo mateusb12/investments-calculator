@@ -525,7 +525,9 @@ function FiiSimulator() {
                         </h3>
 
                         {/* O Gráfico agora é renderizado aqui */}
-                        <SimulationChart data={simulationData} />
+                        <div className="-mx-6 mt-4 mb-2">
+                            <SimulationChart data={simulationData} />
+                        </div>
                         {/* --- FIM DA MUDANÇA --- */}
 
                     </div>
