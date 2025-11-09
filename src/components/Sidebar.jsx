@@ -1,30 +1,24 @@
 import { useState } from 'react';
-
-// 1. Import all your calculator components HERE
 import CompoundInterestCalculator from '../pages/CompoundInterestCalculator.jsx';
-import RentabilityComparisonCalculator from '../pages/RentabilityComparisonCalculator.jsx';
 import ReverseImpactCalculator from "../pages/ReverseImpactCalculator.jsx";
 import FiiHistoricalChecker from "../pages/FiiHistoricalChecker.jsx";
-// --- ADICIONADO ---
 import FiiSimulator from "../pages/FiiSimulator.jsx";
+import RentabilityComparisonCalculator from "../pages/RentabilityComparisonCalculator.jsx";
 
-// 2. This is now the SINGLE SOURCE OF TRUTH
-// We've added a 'component' key to hold the actual component
 const menuItems = [
+    // ... (your menuItems array is unchanged)
     {
         id: 'fii-historical-checker',
         label: 'Histórico de FIIs (HG Brasil)',
         icon: '🏠',
         component: FiiHistoricalChecker
     },
-    // --- ADICIONADO COMO SEGUNDA OPÇÃO ---
     {
         id: 'fii-simulator',
         label: 'Simulador de Investimento (FIIs)',
         icon: '📈',
         component: FiiSimulator
     },
-    // ------------------------------------
     {
         id: 'rentability-comparison',
         label: 'Comparação de Rentabilidade (LCI/LCAs vs CDB)',
@@ -39,23 +33,26 @@ const menuItems = [
     }
 ];
 
-// 3. Export the default calculator for App.jsx to use
 export const defaultCalculator = menuItems[0];
 
 
-// 4. The Sidebar component
-function Sidebar({ onSelectCalculator }) {
-    // Set the initial active item from our default export
+// --- UPDATED ---
+// Accept new props: isMobileOpen and onClose
+function Sidebar({ onSelectCalculator, isMobileOpen, onClose }) {
     const [activeItem, setActiveItem] = useState(defaultCalculator.id);
 
     const handleItemClick = (item) => {
         setActiveItem(item.id);
-        // 5. Pass the ENTIRE component up to App.jsx, not just a string ID
-        onSelectCalculator(() => item.component);
+        // --- UPDATED ---
+        // Pass the component *directly* to the handler
+        // The handler in App.jsx now closes the menu
+        onSelectCalculator(item.component);
     };
 
-    return (
-        <div className="w-64 bg-gray-800 text-white h-screen p-4 flex flex-col">
+    // --- NEW ---
+    // Extracted the sidebar content to reuse it
+    const sidebarContent = (
+        <>
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-center">Calculadora de Investimentos</h1>
             </div>
@@ -65,7 +62,6 @@ function Sidebar({ onSelectCalculator }) {
                     {menuItems.map((item) => (
                         <li key={item.id}>
                             <button
-                                // Pass the whole item object
                                 onClick={() => handleItemClick(item)}
                                 className={`w-full text-left px-4 py-3 rounded-lg transition-colors duration-200 flex items-center space-x-3 ${
                                     activeItem === item.id
@@ -84,7 +80,38 @@ function Sidebar({ onSelectCalculator }) {
             <div className="pt-4 border-t border-gray-700">
                 <p className="text-xs text-gray-400 text-center">© 2024 Ferramentas de Investimento</p>
             </div>
-        </div>
+        </>
+    );
+
+    // --- NEW ---
+    // Return a fragment with two versions of the sidebar: mobile and desktop
+    return (
+        <>
+            {/* --- MOBILE DRAWER --- */}
+
+            {/* Overlay: visible on mobile when menu is open */}
+            <div
+                className={`fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity md:hidden ${
+                    isMobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                }`}
+                onClick={onClose} // Click overlay to close
+            ></div>
+
+            {/* Drawer Panel: slides in from the left */}
+            <div
+                className={`fixed top-0 left-0 h-full w-64 bg-gray-800 text-white p-4 flex flex-col z-40 transform transition-transform md:hidden ${
+                    isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+                }`}
+            >
+                {sidebarContent}
+            </div>
+
+            {/* --- DESKTOP SIDEBAR --- */}
+            {/* This is your original sidebar, but now it's hidden on mobile */}
+            <div className="hidden md:flex md:flex-col md:w-64 bg-gray-800 text-white h-screen p-4">
+                {sidebarContent}
+            </div>
+        </>
     );
 }
 
