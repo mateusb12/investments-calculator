@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     fetchFiiDividendForMonth,
     fetchUniqueTickers,
-    fetchFiiDateRange // <-- NOVO
+    fetchFiiDateRange // <-- Necessário para o pre-flight
 } from "../services/b3service";
 import SimulationChart from "./SimulationChart.jsx";
 
@@ -38,10 +38,8 @@ function addMonths(date, months) {
 function FiiSimulator() {
     // --- States para o Formulário ---
     const [ticker, setTicker] = useState('');
-    const [initialInvestment, setInitialInvestment] = useState('10000');
+    const [initialInvestment, setInitialInvestment] = useState('1000');
     const [monthlyDeposit, setMonthlyDeposit] = useState('500');
-
-    // 2. MUDANÇA: Voltamos para 'simulationMonths'
     const [simulationMonths, setSimulationMonths] = useState('24');
     const [simulationPeriodText, setSimulationPeriodText] = useState(''); // Para o resumo
 
@@ -56,7 +54,12 @@ function FiiSimulator() {
     const [simulationData, setSimulationData] = useState([]);
     const [summaryData, setSummaryData] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null); // Agora pode ser usado para avisos
+    const [error, setError] = useState(null);
+
+    // --- 1. NOVOS STATES PARA O PRE-FLIGHT ---
+    const [fiiDateRange, setFiiDateRange] = useState(null);
+    const [dateRangeLoading, setDateRangeLoading] = useState(false);
+    const [dateRangeError, setDateRangeError] = useState(null); // Erro específico do range
 
     // --- Carregar Tickers (sem mudanças) ---
     useEffect(() => {
@@ -76,7 +79,57 @@ function FiiSimulator() {
         loadTickers();
     }, []);
 
-    // --- 3. LÓGICA DA SIMULAÇÃO (REFEITA COM VALIDAÇÃO) ---
+    // --- 2. NOVO HOOK: BUSCA O RANGE QUANDO O TICKER MUDA ---
+    useEffect(() => {
+        // Limpa o range antigo e erros se o ticker for limpo
+        if (!ticker) {
+            setFiiDateRange(null);
+            setDateRangeError(null);
+            return;
+        }
+
+        async function loadDateRange() {
+            setDateRangeLoading(true);
+            setDateRangeError(null);
+            setFiiDateRange(null);
+            setError(null); // Limpa o erro principal da simulação
+
+            try {
+                const range = await fetchFiiDateRange(ticker);
+                setFiiDateRange(range);
+
+                // --- LÓGICA DE AJUSTE DO PERÍODO ---
+                if (range && range.oldest_date && range.newest_date) {
+                    const [endYear, endMonth] = range.newest_date.split('-').map(Number);
+                    const [oldYear, oldMonth] = range.oldest_date.split('-').map(Number);
+
+                    // Calcula o número máximo de meses no histórico
+                    const maxMonths = (endYear - oldYear) * 12 + (endMonth - oldMonth) + 1;
+
+                    // Ajusta o input "Período (meses)" se for maior que o máximo
+                    setSimulationMonths(currentMonthsStr => {
+                        const currentMonths = parseInt(currentMonthsStr, 10) || 0;
+                        if (currentMonths > maxMonths) {
+                            return String(maxMonths); // Ajusta para o máximo
+                        }
+                        return currentMonthsStr; // Mantém o valor atual
+                    });
+                }
+
+            } catch (err) {
+                console.error(err);
+                // Define um erro específico para esta falha
+                setDateRangeError(`Erro ao buscar histórico para ${ticker}. (Verifique se a view 'fii_date_ranges' existe)`);
+            } finally {
+                setDateRangeLoading(false);
+            }
+        }
+
+        loadDateRange();
+    }, [ticker]); // Dependência: Roda toda vez que 'ticker' mudar
+
+
+    // --- 3. LÓGICA DA SIMULAÇÃO (MODIFICADA) ---
     const handleRunSimulation = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -90,10 +143,12 @@ function FiiSimulator() {
             const monthlyDep = parseFloat(monthlyDeposit) || 0;
             const requestedMonths = parseInt(simulationMonths) || 1;
 
-            // ----- 1. Buscar o Range de Datas do FII -----
-            const dateRange = await fetchFiiDateRange(ticker);
+            // ----- 1. Buscar o Range de Datas (AGORA USA O STATE) -----
+            const dateRange = fiiDateRange; // <-- USA O STATE!
+
             if (!dateRange || !dateRange.newest_date || !dateRange.oldest_date) {
-                throw new Error(`Não foi possível encontrar o histórico de datas para ${ticker}.`);
+                // Se o estado for nulo, algo deu errado no useEffect
+                throw new Error(dateRangeError || `Histórico de datas para ${ticker} não foi carregado.`);
             }
 
             // ----- 2. Calcular o Período de Simulação -----
@@ -142,7 +197,11 @@ function FiiSimulator() {
                 // Se mesmo após a validação não achar (o que é raro), usamos o próximo mês
                 // Mas para o aporte inicial, precisamos de *um* preço.
                 // Vamos buscar o dado da *data mais antiga* que é o nosso start.
-                const { data: firstEverData } = await supabase
+
+                // *** NOTA: Esta query interna pode ser otimizada, mas vamos mantê-la
+                //     pela lógica original que você tinha.
+                //     O ideal seria usar a 'b3service' mas ela não tem essa função específica.
+                const { data: firstEverData, error: firstEverError } = await supabase
                     .from('b3_fiis_dividends')
                     .select('price_close')
                     .eq('ticker', ticker.toUpperCase())
@@ -151,7 +210,10 @@ function FiiSimulator() {
                     .limit(1)
                     .single();
 
-                if (!firstEverData) throw new Error(`Falha crítica: não foi possível obter nenhum preço inicial para ${ticker}.`);
+                if (firstEverError || !firstEverData) {
+                    console.error("Erro ao buscar primeiro preço:", firstEverError);
+                    throw new Error(`Falha crítica: não foi possível obter nenhum preço inicial para ${ticker}.`);
+                }
                 lastPrice = parseFloat(firstEverData.price_close);
             } else {
                 lastPrice = parseFloat(firstMonthData.price_close);
@@ -293,7 +355,7 @@ function FiiSimulator() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label htmlFor="initial-inv" className="block text-sm font-medium text-gray-700 mb-2">
-                                Invest. Inicial (R$)
+                                Investimento Inicial (R$)
                             </label>
                             <input
                                 type="number"
@@ -327,18 +389,32 @@ function FiiSimulator() {
                                 type="number"
                                 id="sim-months"
                                 value={simulationMonths}
-                                onChange={(e) => setSimulationMonths(e.g.target.value)}
+                                onChange={(e) => setSimulationMonths(e.target.value)}
                                 disabled={loading}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 placeholder="24"
                             />
+                            {/* --- 4. ÁREA DE MENSAGEM DO PRE-FLIGHT --- */}
+                            <div className="h-5 mt-1">
+                                {dateRangeLoading && (
+                                    <p className="text-xs text-gray-500">Carregando histórico...</p>
+                                )}
+                                {dateRangeError && (
+                                    <p className="text-xs text-red-600">{dateRangeError}</p>
+                                )}
+                                {fiiDateRange && !dateRangeLoading && !dateRangeError && (
+                                    <p className="text-xs text-gray-600">
+                                        Data mais antiga: {formatDate(new Date(fiiDateRange.oldest_date.replace(/-/g, '/')))}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* --- Botão de Simular --- */}
+                    {/* --- Botão de Simular (atualizado) --- */}
                     <button
                         type="submit"
-                        disabled={loading || tickersLoading || !ticker}
+                        disabled={loading || tickersLoading || !ticker || dateRangeLoading}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50"
                     >
                         {loading ? "Simulando..." : "Rodar Simulação"}

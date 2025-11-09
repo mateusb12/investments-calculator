@@ -80,6 +80,17 @@ function SimulationChart({ data }) {
                         <Tooltip formatter={tooltipFormatter} />
                         <Legend />
 
+                        {/* Linha: Montante Sem Reinvestir */}
+                        <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="noReinvestEnd"
+                            name="Montante (Sem Reinvestir)"
+                            stroke="#7e22ce" // Roxo
+                            strokeWidth={2}
+                            strokeOpacity={0.75}
+                        />
+
                         {/* Linha: Montante Reinvestindo */}
                         <Line
                             yAxisId="left"
@@ -89,16 +100,6 @@ function SimulationChart({ data }) {
                             stroke="#16a34a" // Verde
                             strokeWidth={2}
                             activeDot={{ r: 8 }}
-                        />
-
-                        {/* Linha: Montante Sem Reinvestir */}
-                        <Line
-                            yAxisId="left"
-                            type="monotone"
-                            dataKey="noReinvestEnd"
-                            name="Montante (Sem Reinvestir)"
-                            stroke="#7e22ce" // Roxo
-                            strokeWidth={2}
                         />
 
                         {/* Linha: Preço da Cota */}
