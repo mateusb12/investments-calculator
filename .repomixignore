@@ -1,0 +1,10 @@
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+
+*.svg
+.gitignore
+.repomixignore
+README.md
+package-lock.json
