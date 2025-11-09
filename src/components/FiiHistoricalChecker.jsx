@@ -6,7 +6,8 @@ import {
     fetchUniqueTickers,
     fetchFiiDateRange
 } from "../services/b3service";
-import { createClient } from '@supabase/supabase-js'; // Importa o Supabase client
+import { createClient } from '@supabase/supabase-js';
+import SimulationChart from "./SimulationChart.jsx"; // Importa o Supabase client
 
 // Helper para formatar moeda (com casas decimais flexíveis)
 const formatCurrency = (num, decimals = 2) =>
@@ -584,6 +585,11 @@ function FiiSimulator() {
                             </table>
                         </div>
                     </div>
+                )}
+
+                {/* --- GRÁFICO DE EVOLUÇÃO (ADICIONADO) --- */}
+                {simulationData.length > 0 && !loading && (
+                    <SimulationChart data={simulationData} />
                 )}
             </div>
         </div>
