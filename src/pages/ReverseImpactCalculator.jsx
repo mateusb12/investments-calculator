@@ -1,20 +1,14 @@
 import { useState, useCallback } from 'react';
 
-/**
- * Retorna a alíquota de IR com base no número de dias.
- * @param {number} days
- */
+
 const getCdbTaxRate = (days) => {
-    if (days <= 180) return 0.225; // 22.5%
-    if (days <= 360) return 0.20;  // 20%
-    if (days <= 720) return 0.175; // 17.5%
-    return 0.15; // 15%
+    if (days <= 180) return 0.225; 
+    if (days <= 360) return 0.20;  
+    if (days <= 720) return 0.175; 
+    return 0.15; 
 };
 
-/**
- * Formata um número para a moeda BRL.
- * @param {number} value
- */
+
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', {
         style: 'currency',
@@ -23,67 +17,67 @@ const formatCurrency = (value) => {
 };
 
 function ReverseImpactCalculator() {
-    // Inputs do usuário
+    
     const [targetImpact, setTargetImpact] = useState(2000);
     const [initialCapital, setInitialCapital] = useState(8000);
     const [monthlyContribution, setMonthlyContribution] = useState(2500);
     const [cdiRate, setCdiRate] = useState(14.9);
-    const [lciRatePercent, setLciRatePercent] = useState(95); // Ex: 95% do CDI
-    const [cdbRatePercent, setCdbRatePercent] = useState(110); // Ex: 110% do CDI
+    const [lciRatePercent, setLciRatePercent] = useState(95); 
+    const [cdbRatePercent, setCdbRatePercent] = useState(110); 
 
-    // Outputs da simulação
+    
     const [result, setResult] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [history, setHistory] = useState([]); // <-- NOVO ESTADO PARA O HISTÓRICO
+    const [history, setHistory] = useState([]); 
 
     const calculateTimeToImpact = useCallback(() => {
         setIsLoading(true);
         setResult(null);
         setError(null);
-        setHistory([]); // <-- LIMPA O HISTÓRICO ANTIGO
+        setHistory([]); 
 
-        // --- Inicia a simulação ---
+        
         setTimeout(() => {
             try {
-                // 1. Calcular taxas mensais efetivas
+                
                 const annualLciRate = (lciRatePercent / 100) * (cdiRate / 100);
                 const annualCdbRate = (cdbRatePercent / 100) * (cdiRate / 100);
 
                 const monthlyLciRate = (1 + annualLciRate)**(1 / 12) - 1;
                 const monthlyCdbRate = (1 + annualCdbRate)**(1 / 12) - 1;
 
-                // 2. Variáveis da simulação
+                
                 let months = 0;
                 let lciValue = initialCapital;
                 let cdbGrossValue = initialCapital;
-                let cdbPrincipal = initialCapital; // Total de dinheiro "colocado" no CDB
+                let cdbPrincipal = initialCapital; 
 
                 let netDifference = 0;
-                const maxMonths = 12 * 30; // Limite de 30 anos
+                const maxMonths = 12 * 30; 
 
-                // Variáveis para o histórico
+                
                 let simulationHistory = [];
                 const startDate = new Date();
 
-                // 3. Loop de simulação (mês a mês)
+                
                 while (netDifference < targetImpact && months < maxMonths) {
 
                     const lciMonthStart = lciValue;
                     const cdbMonthStart = cdbGrossValue;
 
-                    // Define o aporte do mês (se for mês 0, é o capital inicial, senão é o aporte mensal)
+                    
                     const currentContribution = (months === 0) ? initialCapital : monthlyContribution;
 
-                    // Aporte é feito no início do mês (SE não for o primeiro mês)
+                    
                     if (months > 0) {
                         lciValue += monthlyContribution;
                         cdbGrossValue += monthlyContribution;
                         cdbPrincipal += monthlyContribution;
                     }
 
-                    // Rentabilidade do mês é aplicada sobre o valor atual
-                    // Precisamos guardar o valor *antes* de aplicar os juros para calcular o rendimento
+                    
+                    
                     const lciValueBeforeInterest = lciValue;
                     const cdbValueBeforeInterest = cdbGrossValue;
 
@@ -95,19 +89,19 @@ function ReverseImpactCalculator() {
 
                     months++;
 
-                    // 4. Calcular o valor líquido de cada um no final deste mês
+                    
                     const lciNetValue = lciValue;
 
                     const cdbGrossProfit = cdbGrossValue - cdbPrincipal;
-                    const daysElapsed = months * (365.25 / 12); // Dias médios
+                    const daysElapsed = months * (365.25 / 12); 
                     const taxRate = getCdbTaxRate(daysElapsed);
                     const taxPaid = cdbGrossProfit * taxRate;
                     const cdbNetValue = cdbGrossValue - taxPaid;
 
-                    // 5. Verificar o "impacto" (diferença)
+                    
                     netDifference = Math.abs(lciNetValue - cdbNetValue);
 
-                    // --- 6. ADICIONA AO HISTÓRICO ---
+                    
                     const currentDate = new Date(startDate);
                     currentDate.setMonth(startDate.getMonth() + months - 1);
                     const monthYear = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' }).format(currentDate);
@@ -126,12 +120,12 @@ function ReverseImpactCalculator() {
                     });
                 }
 
-                // 7. Fim do loop, verificar o resultado
+                
                 if (months >= maxMonths && netDifference < targetImpact) {
                     setError(`O impacto de ${formatCurrency(targetImpact)} não foi atingido em 30 anos. A diferença máxima atingida foi de ${formatCurrency(netDifference)}.`);
-                    setHistory([]); // Limpa histórico em caso de erro
+                    setHistory([]); 
                 } else {
-                    // Sucesso!
+                    
                     const years = Math.floor(months / 12);
                     const remainingMonths = months % 12;
 
@@ -150,13 +144,13 @@ function ReverseImpactCalculator() {
                         finalDifference: netDifference,
                     });
 
-                    setHistory(simulationHistory); // <-- SALVA O HISTÓRICO NO ESTADO
+                    setHistory(simulationHistory); 
                 }
 
             } catch (e) {
                 console.error(e);
                 setError("Ocorreu um erro no cálculo. Verifique se as taxas são válidas.");
-                setHistory([]); // Limpa histórico em caso de erro
+                setHistory([]); 
             } finally {
                 setIsLoading(false);
             }
@@ -171,11 +165,8 @@ function ReverseImpactCalculator() {
                 atinja um valor específico (seu "impacto" desejado).
             </p>
 
-            {/* --- Formulário de Inputs --- */}
             <div className="border border-gray-500 bg-white rounded-lg shadow-md p-6 max-w-2xl">
-                {/* ... (O conteúdo do formulário permanece o mesmo) ... */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Coluna 1: Cenário */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Impacto Desejado (R$)
@@ -229,7 +220,6 @@ function ReverseImpactCalculator() {
                         />
                     </div>
 
-                    {/* Coluna 2: Investimentos */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Opção 1: LCI/LCAs (% do CDI)
@@ -267,7 +257,6 @@ function ReverseImpactCalculator() {
                 </button>
             </div>
 
-            {/* --- Seção de Loading --- */}
             {isLoading && (
                 <div className="mt-8 text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -275,7 +264,6 @@ function ReverseImpactCalculator() {
                 </div>
             )}
 
-            {/* --- Seção de Erro --- */}
             {error && (
                 <div className="mt-8 max-w-2xl p-6 bg-red-50 border border-red-300 rounded-lg shadow-md">
                     <h3 className="text-2xl font-bold text-red-800 mb-3">Erro na Simulação</h3>
@@ -283,7 +271,6 @@ function ReverseImpactCalculator() {
                 </div>
             )}
 
-            {/* --- Seção de Resultados --- */}
             {result && !isLoading && (
                 <div className="mt-8 max-w-2xl p-6 bg-green-50 border-2 border-green-300 rounded-lg shadow-lg">
                     <h3 className="text-2xl font-bold text-green-800 mb-4">Simulação Concluída!</h3>
@@ -316,7 +303,6 @@ function ReverseImpactCalculator() {
                 </div>
             )}
 
-            {/* --- INÍCIO DA NOVA SEÇÃO: DETALHES DA SIMULAÇÃO --- */}
             {history.length > 0 && !isLoading && (
                 <div className="mt-10 max-w-7xl mx-auto">
                     <h3 className="text-2xl font-bold text-gray-800 mb-4">Detalhes da Simulação (Mês a Mês)</h3>
@@ -372,7 +358,6 @@ function ReverseImpactCalculator() {
                     </div>
                 </div>
             )}
-            {/* --- FIM DA NOVA SEÇÃO --- */}
 
         </div>
     );

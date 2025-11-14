@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-// 1. Importa fetchFiiDividends e remove fetchB3Prices
+
 import { fetchFiiDividends, fetchUniqueTickers } from "../services/b3service.js";
 import Pagination from '../components/Pagination.jsx';
 
 function FiiHistoricalChecker() {
-    // States (sem mudanças)
     const [ticker, setTicker] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize] = useState(50);
@@ -17,11 +16,9 @@ function FiiHistoricalChecker() {
     const [tickersLoading, setTickersLoading] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-    // Refs (sem mudanças)
     const inputRef = useRef(null);
     const comboboxRef = useRef(null);
 
-    // 2. loadPage agora usa fetchFiiDividends
     const loadPage = async (pageToLoad, tickerToSearch = null) => {
         setLoading(true);
         setError(null);
@@ -31,7 +28,6 @@ function FiiHistoricalChecker() {
             return;
         }
         try {
-            // AQUI ESTÁ A MUDANÇA PRINCIPAL
             const { data, count } = await fetchFiiDividends(tickerToFetch, pageToLoad, pageSize);
 
             setData(data);
@@ -41,7 +37,6 @@ function FiiHistoricalChecker() {
             }
         } catch (err) {
             console.error(err);
-            // Mensagem de erro atualizada
             setError('Erro ao buscar dividendos no Supabase.');
             setData([]);
             setTotal(0);
@@ -50,7 +45,6 @@ function FiiHistoricalChecker() {
         }
     };
 
-    // useEffect para carregar tickers (sem mudanças)
     useEffect(() => {
         async function loadTickers() {
             setTickersLoading(true);
@@ -73,14 +67,12 @@ function FiiHistoricalChecker() {
         loadTickers();
     }, []);
 
-    // useEffect para paginação (sem mudanças)
     useEffect(() => {
         if (searchedTicker && page > 1) {
             loadPage(page);
         }
     }, [page]);
 
-    // handleSearch (sem mudanças)
     const handleSearch = (e) => {
         e.preventDefault();
         if (ticker) {
@@ -90,18 +82,15 @@ function FiiHistoricalChecker() {
         }
     };
 
-    // totalPages & handlePageChange (sem mudanças)
     const totalPages = Math.ceil(total / pageSize);
     const handlePageChange = (newPage) => {
         setPage(newPage);
     };
 
-    // filteredTickers (sem mudanças)
     const filteredTickers = tickerList.filter(t =>
         t.toLowerCase().includes(ticker.toLowerCase())
     );
 
-    // handleBlur (sem mudanças)
     const handleBlur = (e) => {
         if (comboboxRef.current && !comboboxRef.current.contains(e.relatedTarget)) {
             setIsDropdownOpen(false);
@@ -110,12 +99,10 @@ function FiiHistoricalChecker() {
 
     return (
         <div className="p-8">
-            {/* --- TÍTULO --- */}
             <h2 className="text-3xl font-bold mb-6 text-gray-800">
                 Histórico de Dividendos de FIIs
             </h2>
 
-            {/* --- FORMULÁRIO DE BUSCA --- */}
             <div className="border border-gray-500 bg-white rounded-lg shadow-md p-6 max-w-2xl">
                 <form onSubmit={handleSearch} className="space-y-4">
                     <div>
@@ -205,7 +192,6 @@ function FiiHistoricalChecker() {
                 </form>
             </div>
 
-            {/* --- ÁREA DE RESULTADOS --- */}
             <div className="mt-8 max-w-6xl space-y-6">
                 {loading && data.length === 0 && (
                     <p className="text-gray-500">Carregando...</p>

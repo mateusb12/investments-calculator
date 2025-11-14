@@ -1,14 +1,11 @@
-// src/components/FiiSimulator.jsx
 import React, { useState, useEffect, useRef } from 'react';
-// 1. Importa a nova função de serviço
 import {
     fetchFiiDividendForMonth,
     fetchUniqueTickers,
-    fetchFiiDateRange // <-- Necessário para o pre-flight
+    fetchFiiDateRange 
 } from "../services/b3service.js";
 import SimulationChart from "../components/SimulationChart.jsx";
 
-// --- (Helpers de formatação e data, sem mudanças) ---
 const formatCurrency = (num) =>
     new Intl.NumberFormat('pt-BR', {
         style: 'currency',
@@ -26,7 +23,6 @@ const formatDate = (date) => {
 function addMonths(date, months) {
     const d = new Date(date);
     d.setUTCMonth(d.getUTCMonth() + months);
-    // Trata o "dia" para não pular meses (ex: 31 de jan + 1 mês = 28 de fev)
     const day = d.getUTCDate();
     const daysInMonth = new Date(d.getUTCFullYear(), d.getUTCMonth() + 1, 0).getUTCDate();
     if (day > daysInMonth) {
@@ -36,32 +32,27 @@ function addMonths(date, months) {
 }
 
 function FiiSimulator() {
-    // --- States para o Formulário ---
     const [ticker, setTicker] = useState('');
     const [initialInvestment, setInitialInvestment] = useState('1000');
     const [monthlyDeposit, setMonthlyDeposit] = useState('500');
     const [simulationMonths, setSimulationMonths] = useState('24');
-    const [simulationPeriodText, setSimulationPeriodText] = useState(''); // Para o resumo
+    const [simulationPeriodText, setSimulationPeriodText] = useState(''); 
 
-    // ... (States do ComboBox de Ticker não mudam) ...
     const [tickerList, setTickerList] = useState([]);
     const [tickersLoading, setTickersLoading] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const inputRef = useRef(null);
     const comboboxRef = useRef(null);
 
-    // ... (States de Resultado não mudam) ...
     const [simulationData, setSimulationData] = useState([]);
     const [summaryData, setSummaryData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // --- 1. NOVOS STATES PARA O PRE-FLIGHT ---
     const [fiiDateRange, setFiiDateRange] = useState(null);
     const [dateRangeLoading, setDateRangeLoading] = useState(false);
-    const [dateRangeError, setDateRangeError] = useState(null); // Erro específico do range
+    const [dateRangeError, setDateRangeError] = useState(null); 
 
-    // --- Carregar Tickers (sem mudanças) ---
     useEffect(() => {
         async function loadTickers() {
             setTickersLoading(true);
@@ -73,15 +64,13 @@ function FiiSimulator() {
                 if (defaultTicker) {
                     setTicker(defaultTicker);
                 }
-            } catch (err) { /* ... */ }
+            } catch (err) {  }
             finally { setTickersLoading(false); }
         }
         loadTickers();
     }, []);
 
-    // --- 2. NOVO HOOK: BUSCA O RANGE QUANDO O TICKER MUDA ---
     useEffect(() => {
-        // Limpa o range antigo e erros se o ticker for limpo
         if (!ticker) {
             setFiiDateRange(null);
             setDateRangeError(null);
@@ -92,33 +81,28 @@ function FiiSimulator() {
             setDateRangeLoading(true);
             setDateRangeError(null);
             setFiiDateRange(null);
-            setError(null); // Limpa o erro principal da simulação
+            setError(null); 
 
             try {
                 const range = await fetchFiiDateRange(ticker);
                 setFiiDateRange(range);
 
-                // --- LÓGICA DE AJUSTE DO PERÍODO ---
                 if (range && range.oldest_date && range.newest_date) {
                     const [endYear, endMonth] = range.newest_date.split('-').map(Number);
                     const [oldYear, oldMonth] = range.oldest_date.split('-').map(Number);
-
-                    // Calcula o número máximo de meses no histórico
                     const maxMonths = (endYear - oldYear) * 12 + (endMonth - oldMonth) + 1;
 
-                    // Ajusta o input "Período (meses)" se for maior que o máximo
                     setSimulationMonths(currentMonthsStr => {
                         const currentMonths = parseInt(currentMonthsStr, 10) || 0;
                         if (currentMonths > maxMonths) {
-                            return String(maxMonths); // Ajusta para o máximo
+                            return String(maxMonths); 
                         }
-                        return currentMonthsStr; // Mantém o valor atual
+                        return currentMonthsStr; 
                     });
                 }
 
             } catch (err) {
                 console.error(err);
-                // Define um erro específico para esta falha
                 setDateRangeError(`Erro ao buscar histórico para ${ticker}. (Verifique se a view 'fii_date_ranges' existe)`);
             } finally {
                 setDateRangeLoading(false);
@@ -126,14 +110,13 @@ function FiiSimulator() {
         }
 
         loadDateRange();
-    }, [ticker]); // Dependência: Roda toda vez que 'ticker' mudar
+    }, [ticker]); 
 
 
-    // --- 3. LÓGICA DA SIMULAÇÃO (MODIFICADA) ---
     const handleRunSimulation = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError(null); // Limpa erros/avisos anteriores
+        setError(null); 
         setSimulationData([]);
         setSummaryData(null);
         setSimulationPeriodText('');
@@ -143,47 +126,37 @@ function FiiSimulator() {
             const monthlyDep = parseFloat(monthlyDeposit) || 0;
             const requestedMonths = parseInt(simulationMonths) || 1;
 
-            // ----- 1. Buscar o Range de Datas (AGORA USA O STATE) -----
-            const dateRange = fiiDateRange; // <-- USA O STATE!
+            const dateRange = fiiDateRange; 
 
             if (!dateRange || !dateRange.newest_date || !dateRange.oldest_date) {
-                // Se o estado for nulo, algo deu errado no useEffect
                 throw new Error(dateRangeError || `Histórico de datas para ${ticker} não foi carregado.`);
             }
 
-            // ----- 2. Calcular o Período de Simulação -----
             const [endYear, endMonth, endDay] = dateRange.newest_date.split('-').map(Number);
             const simEndDate = new Date(Date.UTC(endYear, endMonth - 1, endDay));
 
-            // Calcula a data de início (voltando N-1 meses do fim)
-            // e trava no dia 1 para consistência
             let simStartDate = addMonths(simEndDate, -(requestedMonths - 1));
             simStartDate.setUTCDate(1);
 
-            // ----- 3. Validar o Período (A CORREÇÃO PRINCIPAL) -----
             const [oldYear, oldMonth, oldDay] = dateRange.oldest_date.split('-').map(Number);
             const oldestDateObj = new Date(Date.UTC(oldYear, oldMonth - 1, oldDay));
-            oldestDateObj.setUTCDate(1); // Também trava no dia 1
+            oldestDateObj.setUTCDate(1); 
 
             let actualMonths = requestedMonths;
 
             if (simStartDate < oldestDateObj) {
                 const oldStartDate = simStartDate;
-                simStartDate = oldestDateObj; // Ajusta a data de início para a mais antiga possível
+                simStartDate = oldestDateObj; 
 
-                // Recalcula o número real de meses
                 actualMonths = (simEndDate.getUTCFullYear() - simStartDate.getUTCFullYear()) * 12 +
                     (simEndDate.getUTCMonth() - simStartDate.getUTCMonth()) + 1;
 
-                // Define um AVISO (não um erro fatal)
                 setError(`Aviso: O período solicitado (${requestedMonths} meses, desde ${formatDate(oldStartDate)}) 
                           é maior que o histórico disponível. 
                           Simulando com o máximo de ${actualMonths} meses (desde ${formatDate(simStartDate)}).`);
             }
 
             setSimulationPeriodText(`(${actualMonths} meses: ${formatDate(simStartDate)} a ${formatDate(simEndDate)})`);
-
-            // ----- 4. Início do Investimento (Mês 0) -----
             let sharesReinvest = 0;
             let sharesNoReinvest = 0;
             let totalDividendsWithdrawn = 0;
@@ -194,13 +167,6 @@ function FiiSimulator() {
             const firstMonthData = await fetchFiiDividendForMonth(ticker, simStartDate.getUTCMonth() + 1, simStartDate.getUTCFullYear());
 
             if (!firstMonthData) {
-                // Se mesmo após a validação não achar (o que é raro), usamos o próximo mês
-                // Mas para o aporte inicial, precisamos de *um* preço.
-                // Vamos buscar o dado da *data mais antiga* que é o nosso start.
-
-                // *** NOTA: Esta query interna pode ser otimizada, mas vamos mantê-la
-                //     pela lógica original que você tinha.
-                //     O ideal seria usar a 'b3service' mas ela não tem essa função específica.
                 const { data: firstEverData, error: firstEverError } = await supabase
                     .from('b3_fiis_dividends')
                     .select('price_close')
@@ -236,11 +202,10 @@ function FiiSimulator() {
                 currentPrice: lastPrice
             });
 
-            // ----- 5. Loop Mensal (A partir do Mês 1) -----
             let currentDate = addMonths(simStartDate, 1);
 
             while (currentDate <= simEndDate) {
-                const currentMonth = currentDate.getUTCMonth() + 1; // 1-12
+                const currentMonth = currentDate.getUTCMonth() + 1; 
                 const currentYear = currentDate.getUTCFullYear();
 
                 const monthData = await fetchFiiDividendForMonth(ticker, currentMonth, currentYear);
@@ -287,7 +252,6 @@ function FiiSimulator() {
                 currentDate = addMonths(currentDate, 1);
             }
 
-            // ----- 6. Salvar Resultados -----
             setSimulationData(simulationTable);
 
             const reinvestFinalValue = sharesReinvest * lastPrice;
@@ -310,7 +274,6 @@ function FiiSimulator() {
         }
     };
 
-    // --- Handlers do ComboBox (sem mudanças) ---
     const handleBlur = (e) => {
         if (comboboxRef.current && !comboboxRef.current.contains(e.relatedTarget)) {
             setIsDropdownOpen(false);
@@ -320,24 +283,20 @@ function FiiSimulator() {
         t.toLowerCase().includes(ticker.toLowerCase())
     );
 
-    // --- JSX ---
     return (
         <div className="p-8">
             <h2 className="text-3xl font-bold mb-6 text-gray-800">
                 Simulador de Investimento em FIIs
             </h2>
 
-            {/* --- FORMULÁRIO DE INPUT --- */}
             <div className="border border-gray-500 bg-white rounded-lg shadow-md p-6 max-w-2xl mb-8">
                 <form onSubmit={handleRunSimulation} className="space-y-4">
 
-                    {/* --- Seletor de Ticker (sem mudanças) --- */}
                     <div>
                         <label htmlFor="ticker-input" className="block text-sm font-medium text-gray-700 mb-2">
                             Ticker do FII
                         </label>
                         <div className="relative" ref={comboboxRef} onBlur={handleBlur}>
-                            {/* ... (Input, Botão e Dropdown do combobox) ... */}
                             <input ref={inputRef} type="text" id="ticker-input" value={ticker} onChange={(e) => { setTicker(e.target.value); setIsDropdownOpen(true); }} onFocus={() => setIsDropdownOpen(true)} disabled={tickersLoading || loading} placeholder="Digite ou selecione um ticker" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white pr-10" autoComplete="off" />
                             <button type="button" disabled={tickersLoading || loading} onClick={() => { setIsDropdownOpen((state) => !state); inputRef.current.focus(); }} className="absolute inset-y-0 right-0 flex items-center justify-center w-10 h-full text-gray-500 hover:text-gray-700"><svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button>
                             {isDropdownOpen && (
@@ -351,7 +310,6 @@ function FiiSimulator() {
                         </div>
                     </div>
 
-                    {/* --- Inputs Financeiros --- */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label htmlFor="initial-inv" className="block text-sm font-medium text-gray-700 mb-2">
@@ -394,7 +352,6 @@ function FiiSimulator() {
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 placeholder="24"
                             />
-                            {/* --- ÁREA DE MENSAGEM DO PRE-FLIGHT --- */}
                             <div className="h-5 mt-1">
                                 {dateRangeLoading && (
                                     <p className="text-xs text-gray-500">Carregando histórico...</p>
@@ -412,7 +369,6 @@ function FiiSimulator() {
                         </div>
                     </div>
 
-                    {/* --- Botão de Simular --- */}
                     <button
                         type="submit"
                         disabled={loading || tickersLoading || !ticker || dateRangeLoading}
@@ -423,18 +379,15 @@ function FiiSimulator() {
                 </form>
             </div>
 
-            {/* --- ÁREA DE RESULTADOS --- */}
             <div className="space-y-8">
                 {loading && <p className="text-gray-500 text-lg">Carregando simulação...</p>}
 
-                {/* Bloco de Erro/Aviso */}
                 {error && (
                     <p className={`mt-6 p-4 rounded-lg ${error.startsWith('Aviso:') ? 'text-orange-700 bg-orange-100' : 'text-red-700 bg-red-100'}`}>
                         {error}
                     </p>
                 )}
 
-                {/* --- RESUMO DA SIMULAÇÃO --- */}
                 {summaryData && !loading && (
                     <div className="border border-gray-300 bg-white rounded-lg shadow-lg p-6">
                         <h3 className="text-2xl font-bold mb-4 text-gray-800">
@@ -443,7 +396,7 @@ function FiiSimulator() {
                                 {simulationPeriodText}
                             </span>
                         </h3>
-                        {/* ... (Cards de Geral, Com e Sem Reinvestimento) ... */}
+                        {}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-gray-100 p-4 rounded-lg">
                                 <h4 className="text-sm font-semibold text-gray-600 uppercase mb-2">Geral</h4>
@@ -472,14 +425,12 @@ function FiiSimulator() {
                 )}
 
 
-                {/* --- TABELA MÊS A MÊS E GRÁFICO --- */}
                 {simulationData.length > 0 && !loading && (
                     <div className="border border-gray-300 bg-white rounded-lg shadow-lg p-6 space-y-6">
                         <h3 className="text-2xl font-bold mb-4 text-gray-800">
                             Detalhes da Simulação (Mês a Mês)
                         </h3>
 
-                        {/* 1. DIV DE OVERFLOW APENAS PARA A TABELA */}
                         <div className="overflow-x-auto">
                             <table className="w-full border-collapse border border-gray-300 text-sm whitespace-nowrap">
                                 <thead className="bg-gray-100">
@@ -515,20 +466,16 @@ function FiiSimulator() {
                                 ))}
                                 </tbody>
                             </table>
-                        </div> {/* <-- FIM DA DIV DE OVERFLOW */}
+                        </div>
 
 
-                        {/* --- INÍCIO DA MUDANÇA --- */}
-                        {/* O Título do gráfico foi movido para cá */}
                         <h3 className="text-2xl font-bold pt-4 text-gray-800">
                             Evolução do Patrimônio vs. Preço da Cota
                         </h3>
 
-                        {/* O Gráfico agora é renderizado aqui */}
                         <div className="-mx-6 mt-4 mb-2">
                             <SimulationChart data={simulationData} />
                         </div>
-                        {/* --- FIM DA MUDANÇA --- */}
 
                     </div>
                 )}

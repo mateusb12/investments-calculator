@@ -6,7 +6,6 @@ import FiiSimulator from "../pages/FiiSimulator.jsx";
 import RentabilityComparisonCalculator from "../pages/RentabilityComparisonCalculator.jsx";
 
 const menuItems = [
-    // ... (your menuItems array is unchanged)
     {
         id: 'fii-historical-checker',
         label: 'Histórico de FIIs (HG Brasil)',
@@ -36,21 +35,21 @@ const menuItems = [
 export const defaultCalculator = menuItems[0];
 
 
-// --- UPDATED ---
-// Accept new props: isMobileOpen and onClose
+
+
 function Sidebar({ onSelectCalculator, isMobileOpen, onClose }) {
     const [activeItem, setActiveItem] = useState(defaultCalculator.id);
 
     const handleItemClick = (item) => {
         setActiveItem(item.id);
-        // --- UPDATED ---
-        // Pass the component *directly* to the handler
-        // The handler in App.jsx now closes the menu
+        
+        
+        
         onSelectCalculator(item.component);
     };
 
-    // --- NEW ---
-    // Extracted the sidebar content to reuse it
+    
+    
     const sidebarContent = (
         <>
             <div className="mb-8">
@@ -83,21 +82,16 @@ function Sidebar({ onSelectCalculator, isMobileOpen, onClose }) {
         </>
     );
 
-    // --- NEW ---
-    // Return a fragment with two versions of the sidebar: mobile and desktop
+    
+    
     return (
         <>
-            {/* --- MOBILE DRAWER --- */}
-
-            {/* Overlay: visible on mobile when menu is open */}
             <div
                 className={`fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity md:hidden ${
                     isMobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 }`}
-                onClick={onClose} // Click overlay to close
+                onClick={onClose} 
             ></div>
-
-            {/* Drawer Panel: slides in from the left */}
             <div
                 className={`fixed top-0 left-0 h-full w-64 bg-gray-800 text-white p-4 flex flex-col z-40 transform transition-transform md:hidden ${
                     isMobileOpen ? 'translate-x-0' : '-translate-x-full'
@@ -105,9 +99,6 @@ function Sidebar({ onSelectCalculator, isMobileOpen, onClose }) {
             >
                 {sidebarContent}
             </div>
-
-            {/* --- DESKTOP SIDEBAR --- */}
-            {/* This is your original sidebar, but now it's hidden on mobile */}
             <div className="hidden md:flex md:flex-col md:w-64 bg-gray-800 text-white h-screen p-4">
                 {sidebarContent}
             </div>
