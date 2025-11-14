@@ -11,17 +11,17 @@ function CompoundInterestCalculator() {
     const r = rate / 100;
     const amount = principal * Math.pow(1 + r / frequency, frequency * time);
     const interest = amount - principal;
-    
+
     setResult({
       totalAmount: amount.toFixed(2),
-      totalInterest: interest.toFixed(2)
+      totalInterest: interest.toFixed(2),
     });
   };
 
   return (
     <div className="p-8">
       <h2 className="text-3xl font-bold mb-6 text-gray-800">Compound Interest Calculator</h2>
-      
+
       <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl">
         <div className="space-y-4">
           <div>
