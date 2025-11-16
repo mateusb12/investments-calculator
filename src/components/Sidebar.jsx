@@ -5,6 +5,8 @@ import FiiHistoricalChecker from '../pages/FiiHistoricalChecker.jsx';
 import FiiSimulator from '../pages/FiiSimulator.jsx';
 import RentabilityComparisonCalculator from '../pages/RentabilityComparisonCalculator.jsx';
 
+import IpcaCalculator from '../pages/IpcaCalculator.jsx';
+
 const menuItems = [
   {
     id: 'fii-historical-checker',
@@ -30,6 +32,13 @@ const menuItems = [
     icon: '⏱️',
     component: ReverseImpactCalculator,
   },
+
+  {
+    id: 'ipca-calculator',
+    label: 'Calculadora de Correção (IPCA)',
+    icon: '📊',
+    component: IpcaCalculator,
+  },
 ];
 
 export const defaultCalculator = menuItems[0];
@@ -39,8 +48,11 @@ function Sidebar({ onSelectCalculator, isMobileOpen, onClose }) {
 
   const handleItemClick = (item) => {
     setActiveItem(item.id);
-
     onSelectCalculator(item.component);
+
+    if (onClose) {
+      onClose();
+    }
   };
 
   const sidebarContent = (
