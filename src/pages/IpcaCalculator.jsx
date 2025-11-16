@@ -73,6 +73,7 @@ function IpcaCalculator() {
         month: formatDate(startDateObj),
         correctedValue: currentValue,
         ipca: 0,
+        refDate: `${startYear}-${String(startMonth).padStart(2, '0')}-01`,
       });
 
       for (const row of ipcaSeries) {
@@ -92,6 +93,7 @@ function IpcaCalculator() {
           month: formatDate(dateObj),
           correctedValue: currentValue,
           ipca: monthlyIpca,
+          refDate: row.ref_date,
         });
       }
 
@@ -148,8 +150,12 @@ function IpcaCalculator() {
                 onChange={(date) => setStartDate(date)}
                 dateFormat="yyyy-MM"
                 showMonthYearPicker
+                showYearDropdown
+                scrollableYearDropdown
+                yearDropdownItemNumber={50}
                 disabled={loading}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                showMonthYearDropdown={true}
               />
             </div>
 
@@ -164,6 +170,9 @@ function IpcaCalculator() {
                 onChange={(date) => setEndDate(date)}
                 dateFormat="yyyy-MM"
                 showMonthYearPicker
+                showYearDropdown
+                scrollableYearDropdown
+                yearDropdownItemNumber={50}
                 disabled={loading}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 showMonthYearDropdown={true}

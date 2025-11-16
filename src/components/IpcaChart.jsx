@@ -28,6 +28,13 @@ const tooltipFormatter = (value, name) => {
   return [value, name];
 };
 
+const formatFullMonth = (date) =>
+  new Intl.DateTimeFormat('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+
 const formatPercent = (value) => `${value.toFixed(1)}%`;
 
 const CustomXAxisTick = ({ x, y, payload, index, data }) => {
@@ -101,7 +108,21 @@ function IpcaChart({ data }) {
             stroke="#2563eb"
           />
 
-          <Tooltip formatter={tooltipFormatter} />
+          <Tooltip
+            formatter={tooltipFormatter}
+            labelFormatter={(label, payload) => {
+              if (!payload || !payload[0]) return label;
+
+              const raw = payload[0].payload.refDate;
+              if (!raw) return label;
+
+              const [year, month] = raw.split('-').map(Number);
+              const dateObj = new Date(Date.UTC(year, month - 1, 1));
+
+              return formatFullMonth(dateObj);
+            }}
+          />
+
           <Legend />
 
           <Line
