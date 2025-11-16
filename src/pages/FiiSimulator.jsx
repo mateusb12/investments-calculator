@@ -5,6 +5,7 @@ import {
   fetchFiiDateRange,
 } from '../services/b3service.js';
 import SimulationChart from '../components/SimulationChart.jsx';
+import { supabase } from '../services/supabaseClient.js';
 
 const formatCurrency = (num) =>
   new Intl.NumberFormat('pt-BR', {

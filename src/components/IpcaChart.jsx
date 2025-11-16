@@ -53,6 +53,21 @@ function IpcaChart({ data }) {
   const maxIpca = Math.max(...ipcaValues);
   const percentDomain = [Math.floor(minIpca) - 1, Math.ceil(maxIpca) + 1];
 
+  const firstMonth = data[0]?.month;
+  const lastMonth = data[data.length - 1]?.month;
+
+  const formatXAxis = (value) => {
+    if (value === firstMonth) {
+      return 'I';
+    }
+
+    if (value === lastMonth) {
+      return 'Fim';
+    }
+
+    return value.replace('. de ', '/').replace('.', '');
+  };
+
   return (
     <div className="" style={{ width: '100%', height: 400 }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -67,10 +82,7 @@ function IpcaChart({ data }) {
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
 
-          <XAxis
-            dataKey="month"
-            tickFormatter={(value) => value.replace('. de ', '/').replace('.', '')}
-          />
+          <XAxis dataKey="month" tickFormatter={formatXAxis} interval="preserveStartEnd" />
 
           {}
           <YAxis
