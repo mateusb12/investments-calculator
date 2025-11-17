@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import ZScoreChart from '../components/ZScoreChart';
 
 const STOCKS = [
@@ -7,6 +7,9 @@ const STOCKS = [
   { id: 'ITUB4', label: 'Itaú Unibanco PN (ITUB4)' },
   { id: 'MGLU3', label: 'Magazine Luiza (MGLU3)' },
 ];
+
+const TRADING_DAYS_PER_MONTH = 21;
+const MAX_MONTHS = 60;
 
 function mean(arr) {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -18,55 +21,101 @@ function stdDev(arr) {
   return Math.sqrt(variance);
 }
 
+function getWindowLabel(months) {
+  if (months < 12) return `(${months} meses)`;
+  if (months === 12) return `(~1 ano)`;
+  if (months % 12 === 0) return `(${months / 12} anos)`;
+  return `(${months} meses)`;
+}
+
 function PricePositionCalculator() {
   const [selected, setSelected] = useState(STOCKS[0].id);
   const [result, setResult] = useState(null);
+  const [timeWindowInMonths, setTimeWindowInMonths] = useState(12);
+  const [deferredTimeWindow, setDeferredTimeWindow] = useState(12);
+  const [isPending, startTransition] = useTransition();
+  const [windowLabel, setWindowLabel] = useState('(~1 ano)');
+  const [chartData, setChartData] = useState([]);
 
-  const [historicalData, setHistoricalData] = useState([]);
+  const [fullHistoricalData, setFullHistoricalData] = useState([]);
+
+  const [currentPrice, setCurrentPrice] = useState(null);
+
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const analyze = async () => {
-    setLoading(true);
-    setErrorMessage('');
-    setResult(null);
-    setHistoricalData([]);
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setErrorMessage('');
+      setResult(null);
+      setFullHistoricalData([]);
+      setCurrentPrice(null);
+
+      try {
+        const response = await fetch(
+          `https://brapi.dev/api/quote/${selected}?range=5y&interval=1d`
+        );
+
+        if (!response.ok) {
+          throw new Error('Erro ao buscar dados na BRAPI');
+        }
+
+        const json = await response.json();
+
+        if (!json.results || json.results.length === 0) {
+          throw new Error('Nenhum dado retornado para este ticker');
+        }
+
+        const apiResult = json.results[0];
+
+        const allPricesData = (apiResult.historicalDataPrice || [])
+          .map((d) => ({ date: d.date, close: d.close }))
+          .filter((d) => typeof d.close === 'number' && !Number.isNaN(d.close));
+
+        if (!allPricesData.length) {
+          throw new Error('Histórico sem preços válidos');
+        }
+
+        setFullHistoricalData(allPricesData);
+
+        const price =
+          typeof apiResult.regularMarketPrice === 'number'
+            ? apiResult.regularMarketPrice
+            : allPricesData[allPricesData.length - 1].close;
+
+        setCurrentPrice(price);
+      } catch (err) {
+        setErrorMessage(err.message || 'Erro inesperado ao processar dados');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selected]);
+
+  useEffect(() => {
+    if (fullHistoricalData.length === 0 || !currentPrice) {
+      setResult(null);
+      return;
+    }
 
     try {
-      const response = await fetch(`https://brapi.dev/api/quote/${selected}?range=1y&interval=1d`);
+      const tradingDaysInWindow = Math.round(timeWindowInMonths * TRADING_DAYS_PER_MONTH);
+      const filteredData = fullHistoricalData.slice(-tradingDaysInWindow);
 
-      if (!response.ok) {
-        throw new Error('Erro ao buscar dados na BRAPI');
+      if (filteredData.length === 0) {
+        setResult(null);
+        setChartData([]);
+        return;
       }
 
-      const json = await response.json();
+      setChartData(filteredData);
 
-      if (!json.results || json.results.length === 0) {
-        throw new Error('Nenhum dado retornado para este ticker');
-      }
-
-      const apiResult = json.results[0];
-
-      const pricesData = (apiResult.historicalDataPrice || [])
-        .map((d) => ({ date: d.date, close: d.close }))
-        .filter((d) => typeof d.close === 'number' && !Number.isNaN(d.close));
-
-      if (!pricesData.length) {
-        throw new Error('Histórico sem preços válidos');
-      }
-
-      setHistoricalData(pricesData);
-
-      const prices = pricesData.map((d) => d.close);
-
-      const currentPrice =
-        typeof apiResult.regularMarketPrice === 'number'
-          ? apiResult.regularMarketPrice
-          : prices[prices.length - 1];
-
+      const prices = filteredData.map((d) => d.close);
       const media = mean(prices);
       const desvio = stdDev(prices);
-
       const z = desvio === 0 ? 0 : (currentPrice - media) / desvio;
 
       const minPrice = Math.min(...prices);
@@ -97,6 +146,8 @@ function PricePositionCalculator() {
         status = '❌ Muito caro (Z ≥ 2)';
       }
 
+      setWindowLabel(getWindowLabel(timeWindowInMonths));
+
       setResult({
         current: currentPrice.toFixed(2),
         media: media.toFixed(2),
@@ -110,12 +161,12 @@ function PricePositionCalculator() {
         percentile: percentile.toFixed(1),
         status,
       });
+      setErrorMessage('');
     } catch (err) {
-      setErrorMessage(err.message || 'Erro inesperado ao processar dados');
-    } finally {
-      setLoading(false);
+      setErrorMessage('Erro ao calcular Z-Score para esta janela.');
+      setResult(null);
     }
-  };
+  }, [deferredTimeWindow, fullHistoricalData, currentPrice]);
 
   return (
     <div className="p-8 max-w-3xl">
@@ -125,10 +176,8 @@ function PricePositionCalculator() {
 
       <div className="bg-white rounded-lg shadow-md p-6">
         <p className="text-gray-700 mb-6">
-          Este módulo usa o histórico de approximately 1 ano da ação selecionada (dados da BRAPI)
-          para calcular <strong>média, desvio padrão e Z-Score</strong>, além de posição no range de
-          preços e percentil. Isso te dá uma noção de quão <strong>esticado ou descontado</strong> o
-          preço atual está em relação ao comportamento recente.
+          Use o slider para ajustar a janela de análise (1-60 meses) e veja o cálculo do Z-Score ser
+          atualizado instantaneamente. Os dados de 5 anos são carregados uma vez por ação.
         </p>
 
         <label className="block text-sm font-medium text-gray-700 mb-2">Selecione a ação:</label>
@@ -136,7 +185,8 @@ function PricePositionCalculator() {
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500"
+          disabled={loading}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-6 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
         >
           {STOCKS.map((stock) => (
             <option key={stock.id} value={stock.id}>
@@ -145,34 +195,61 @@ function PricePositionCalculator() {
           ))}
         </select>
 
-        <button
-          onClick={analyze}
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg"
-        >
-          {loading ? 'Calculando...' : 'Calcular Z-Score'}
-        </button>
+        {}
+        <label className="block text-sm font-medium text-gray-700">
+          Janela de Análise: <span className="font-bold">{timeWindowInMonths} meses</span>
+        </label>
+        <input
+          type="range"
+          min="1"
+          max={MAX_MONTHS}
+          step="1"
+          value={timeWindowInMonths}
+          onChange={(e) => {
+            const newValue = Number(e.target.value);
+
+            setTimeWindowInMonths(newValue);
+
+            startTransition(() => {
+              setDeferredTimeWindow(newValue);
+            });
+          }}
+          disabled={loading || !fullHistoricalData.length}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2 mb-4"
+        />
+        {}
+
+        {}
       </div>
+
+      {loading && (
+        <div className="mt-6 text-center text-blue-600 font-semibold">
+          Carregando dados de 5 anos...
+        </div>
+      )}
 
       {errorMessage && (
         <div className="mt-6 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{errorMessage}</div>
       )}
 
-      {result && (
+      {}
+      {!loading && result && (
         <div className="mt-6 p-4 bg-blue-50 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-3 text-gray-700">Resultado:</h3>
+          <h3 className="text-lg font-semibold mb-3 text-gray-700">
+            Resultado para {windowLabel}:
+          </h3>
 
           <p>
             <strong>Preço atual:</strong> R$ {result.current}
           </p>
           <p>
-            <strong>Mínimo no período (~1 ano):</strong> R$ {result.min}
+            <strong>Mínimo no período {windowLabel}:</strong> R$ {result.min}
           </p>
           <p>
-            <strong>Máximo no período (~1 ano):</strong> R$ {result.max}
+            <strong>Máximo no período {windowLabel}:</strong> R$ {result.max}
           </p>
           <p>
-            <strong>Média no período (~1 ano):</strong> R$ {result.media}
+            <strong>Média no período {windowLabel}:</strong> R$ {result.media}
           </p>
           <p>
             <strong>Desvio padrão:</strong> {result.desvio}
@@ -183,28 +260,28 @@ function PricePositionCalculator() {
 
           {result.positionPct !== null && (
             <p>
-              <strong>Posição no range de 1 ano:</strong> {result.positionPct}% (0% = na mínima,
-              100% = na máxima)
+              <strong>Posição no range {windowLabel}:</strong> {result.positionPct}% (0% = na
+              mínima, 100% = na máxima)
             </p>
           )}
 
           <p className="mt-2 text-sm text-gray-700">
-            Em {result.daysBelowOrEqual} de {result.totalDays} pregões ({result.percentile}% do
-            tempo), o preço esteve <strong>menor ou igual</strong> ao preço atual.
+            Em {result.daysBelowOrEqual} de {result.totalDays} pregões {windowLabel} (
+            {result.percentile}% do tempo), o preço esteve <strong>menor ou igual</strong> ao preço
+            atual.
           </p>
 
           <p className="mt-4 text-xl font-bold">{result.status}</p>
         </div>
       )}
 
-      {}
-      {result && historicalData.length > 0 && (
-        <div className="mt-8">
+      {!loading && result && chartData.length > 0 && (
+        <div className={`mt-8 ${isPending ? 'opacity-60 transition-opacity' : ''}`}>
           <h3 className="text-2xl font-semibold mb-4 text-gray-700">
-            Visualização Gráfica (1 Ano)
+            Visualização Gráfica {windowLabel}
           </h3>
           <div className="bg-white rounded-lg shadow-md p-4 pt-8">
-            <ZScoreChart historicalPrices={historicalData} analysisResult={result} />
+            <ZScoreChart historicalPrices={chartData} analysisResult={result} />
           </div>
         </div>
       )}
