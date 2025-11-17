@@ -4,6 +4,9 @@ import {
   fetchUniqueTickers,
   fetchFiiDateRange,
 } from '../services/b3service.js';
+
+import { getIpcaRange } from '../services/ipcaService.js';
+
 import SimulationChart from '../components/SimulationChart.jsx';
 import { supabase } from '../services/supabaseClient.js';
 
@@ -163,6 +166,33 @@ function FiiSimulator() {
                           Simulando com o máximo de ${actualMonths} meses (desde ${formatDate(simStartDate)}).`);
       }
 
+      const ipcaStartYear = simStartDate.getUTCFullYear();
+      const ipcaStartMonth = simStartDate.getUTCMonth() + 1;
+      const ipcaEndYear = simEndDate.getUTCFullYear();
+      const ipcaEndMonth = simEndDate.getUTCMonth() + 1;
+
+      let ipcaMap = new Map();
+      try {
+        const ipcaData = await getIpcaRange(
+          ipcaStartYear,
+          ipcaStartMonth,
+          ipcaEndYear,
+          ipcaEndMonth
+        );
+        for (const row of ipcaData) {
+          const [year, month] = row.ref_date.split('-').map(Number);
+          const key = `${year}-${month}`;
+          ipcaMap.set(key, 1 + row.ipca / 100);
+        }
+      } catch (ipcaError) {
+        console.error('Erro ao buscar IPCA:', ipcaError);
+        setError(
+          (prevError) =>
+            (prevError ? prevError + '\n' : '') +
+            'Aviso: Não foi possível carregar os dados do IPCA. A linha de inflação não será exibida.'
+        );
+      }
+
       setSimulationPeriodText(
         `(${actualMonths} meses: ${formatDate(simStartDate)} a ${formatDate(simEndDate)})`
       );
@@ -204,6 +234,8 @@ function FiiSimulator() {
       sharesReinvest = initialInv / lastPrice;
       sharesNoReinvest = initialInv / lastPrice;
 
+      let inflationCorrectedValue = initialInv;
+
       simulationTable.push({
         month: formatDate(simStartDate),
         deposit: initialInv,
@@ -215,6 +247,9 @@ function FiiSimulator() {
         noReinvestEnd: initialInv,
         difference: 0,
         currentPrice: lastPrice,
+
+        totalInvested: totalInvested,
+        inflationCorrected: inflationCorrectedValue,
       });
 
       let currentDate = addMonths(simStartDate, 1);
@@ -231,6 +266,15 @@ function FiiSimulator() {
         if (monthData) {
           lastPrice = currentPrice;
         }
+
+        const prevDate = addMonths(currentDate, -1);
+        const prevMonth = prevDate.getUTCMonth() + 1;
+        const prevYear = prevDate.getUTCFullYear();
+        const prevMonthKey = `${prevYear}-${prevMonth}`;
+
+        const monthIpcaFactor = ipcaMap.get(prevMonthKey) || 1.0;
+
+        inflationCorrectedValue = inflationCorrectedValue * monthIpcaFactor + monthlyDep;
 
         totalInvested += monthlyDep;
 
@@ -262,6 +306,9 @@ function FiiSimulator() {
           noReinvestEnd: endValueNoReinvest,
           difference: endValueReinvest - endValueNoReinvest,
           currentPrice: currentPrice,
+
+          totalInvested: totalInvested,
+          inflationCorrected: inflationCorrectedValue,
         });
 
         currentDate = addMonths(currentDate, 1);
@@ -332,7 +379,7 @@ function FiiSimulator() {
               >
                 <svg
                   className="w-5 h-5"
-                  xmlns="http://www.w3.org/2000/svg"
+                  xmlns="http://www.w.0.org/2000/svg"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >

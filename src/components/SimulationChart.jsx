@@ -105,6 +105,30 @@ function SimulationChart({ data }) {
           <Tooltip formatter={tooltipFormatter} />
           <Legend />
 
+          {}
+          <Line
+            yAxisId="left"
+            type="monotone"
+            dataKey="totalInvested"
+            name="Total Investido (Custo)"
+            stroke="#f97316"
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            dot={false}
+          />
+
+          <Line
+            yAxisId="left"
+            type="monotone"
+            dataKey="inflationCorrected"
+            name="Total Investido (Corrigido IPCA)"
+            stroke="#ef4444"
+            strokeWidth={2}
+            strokeDasharray="3 3"
+            dot={false}
+          />
+          {}
+
           <Line
             yAxisId="left"
             type="monotone"

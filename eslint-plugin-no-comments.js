@@ -1,11 +1,11 @@
 function removeLineAndBlockComments(context, comments) {
-  return comments.map((comment) =>
+  for (const comment of comments) {
     context.report({
       node: comment,
       messageId: 'noComment',
       fix: (fixer) => fixer.removeRange(comment.range),
-    })
-  );
+    });
+  }
 }
 
 function shouldRemoveJsxCommentContainer(node) {
@@ -25,16 +25,29 @@ function removeJsxCommentContainer(context, node) {
   });
 }
 
-function createRule(context) {
+function createRemoveCommentsRule(context) {
   const source = context.getSourceCode();
   const comments = source.getAllComments();
-
   removeLineAndBlockComments(context, comments);
 
   return {
     JSXExpressionContainer(node) {
       if (shouldRemoveJsxCommentContainer(node)) {
         removeJsxCommentContainer(context, node);
+      }
+    },
+  };
+}
+
+function createRemoveEmptyBlocksRule(context) {
+  return {
+    BlockStatement(node) {
+      if (node.body.length === 0) {
+        context.report({
+          node,
+          message: 'Empty block is not allowed',
+          fix: (fixer) => fixer.removeRange(node.range),
+        });
       }
     },
   };
@@ -49,7 +62,16 @@ export default {
         docs: { description: 'Remove all comments' },
         messages: { noComment: 'CMT001 Do not commit comments' },
       },
-      create: createRule,
+      create: createRemoveCommentsRule,
+    },
+
+    'no-empty-blocks': {
+      meta: {
+        type: 'suggestion',
+        fixable: 'code',
+        messages: { default: 'Empty block is not allowed' },
+      },
+      create: createRemoveEmptyBlocksRule,
     },
   },
 };

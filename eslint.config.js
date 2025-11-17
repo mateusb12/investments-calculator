@@ -38,6 +38,7 @@ export default defineConfig([
 
     rules: {
       'no-comments/no-explanatory-comments': 'warn',
+      'no-comments/no-empty-blocks': 'warn',
       'prettier/prettier': 'error',
       'no-unused-vars': 'off',
       'react-refresh/only-export-components': 'off',
