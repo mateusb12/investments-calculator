@@ -281,7 +281,11 @@ function PricePositionCalculator() {
             Visualização Gráfica {windowLabel}
           </h3>
           <div className="bg-white rounded-lg shadow-md p-4 pt-8">
-            <ZScoreChart historicalPrices={chartData} analysisResult={result} />
+            <ZScoreChart
+              key={deferredTimeWindow}
+              historicalPrices={chartData}
+              analysisResult={result}
+            />
           </div>
         </div>
       )}
