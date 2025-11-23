@@ -50,6 +50,30 @@ export async function fetchFiiDividends(ticker = null, page = 1, pageSize = 50) 
   return { data, count };
 }
 
+export async function fetchFiiChartData(ticker, months) {
+  let query = supabase
+    .from('b3_fiis_dividends')
+    .select('*')
+    .eq('ticker', ticker.toUpperCase())
+    .gt('dividend_value', 0)
+    .order('trade_date', { ascending: false });
+
+  if (months > 0) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - months);
+    const dateString = date.toISOString().split('T')[0];
+    query = query.gte('trade_date', dateString);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('Erro ao buscar dados do gráfico:', error.message);
+    throw error;
+  }
+
+  return data;
+}
+
 export async function fetchFiiDateRange(ticker) {
   const { data, error } = await supabase
     .from('fii_date_ranges_view')
