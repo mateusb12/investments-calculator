@@ -196,12 +196,15 @@ function FiiSimulator() {
       setSimulationPeriodText(
         `(${actualMonths} meses: ${formatDate(simStartDate)} a ${formatDate(simEndDate)})`
       );
+
       let sharesReinvest = 0;
       let sharesNoReinvest = 0;
       let totalDividendsWithdrawn = 0;
       let totalInvested = 0;
       let simulationTable = [];
+
       let lastPrice = 0;
+      let lastDividend = 0;
 
       const firstMonthData = await fetchFiiDividendForMonth(
         ticker,
@@ -212,7 +215,7 @@ function FiiSimulator() {
       if (!firstMonthData) {
         const { data: firstEverData, error: firstEverError } = await supabase
           .from('b3_fiis_dividends')
-          .select('price_close')
+          .select('price_close, dividend_value')
           .eq('ticker', ticker.toUpperCase())
           .gte('trade_date', dateRange.oldest_date)
           .order('trade_date', { ascending: true })
@@ -226,8 +229,12 @@ function FiiSimulator() {
           );
         }
         lastPrice = parseFloat(firstEverData.price_close);
+
+        lastDividend = lastPrice * parseFloat(firstEverData.dividend_value);
       } else {
         lastPrice = parseFloat(firstMonthData.price_close);
+
+        lastDividend = lastPrice * parseFloat(firstMonthData.dividend_value);
       }
 
       totalInvested = initialInv;
@@ -247,7 +254,6 @@ function FiiSimulator() {
         noReinvestEnd: initialInv,
         difference: 0,
         currentPrice: lastPrice,
-
         totalInvested: totalInvested,
         inflationCorrected: inflationCorrectedValue,
       });
@@ -260,18 +266,26 @@ function FiiSimulator() {
 
         const monthData = await fetchFiiDividendForMonth(ticker, currentMonth, currentYear);
 
-        const currentPrice = monthData ? parseFloat(monthData.price_close) : lastPrice;
-        const dividendPerShare = monthData ? parseFloat(monthData.dividend_value) : 0;
+        let currentPrice = lastPrice;
+        let dividendPerShare = 0;
 
         if (monthData) {
+          currentPrice = parseFloat(monthData.price_close);
+          const yieldValue = parseFloat(monthData.dividend_value);
+
+          dividendPerShare = currentPrice * yieldValue;
+
           lastPrice = currentPrice;
+          lastDividend = dividendPerShare;
+        } else {
+          currentPrice = lastPrice;
+          dividendPerShare = lastDividend;
         }
 
         const prevDate = addMonths(currentDate, -1);
         const prevMonth = prevDate.getUTCMonth() + 1;
         const prevYear = prevDate.getUTCFullYear();
         const prevMonthKey = `${prevYear}-${prevMonth}`;
-
         const monthIpcaFactor = ipcaMap.get(prevMonthKey) || 1.0;
 
         inflationCorrectedValue = inflationCorrectedValue * monthIpcaFactor + monthlyDep;
@@ -279,20 +293,17 @@ function FiiSimulator() {
         totalInvested += monthlyDep;
 
         const startValueReinvest = sharesReinvest * currentPrice;
-        const startValueNoReinvest = sharesNoReinvest * currentPrice;
-
         const dividendsReinvest = sharesReinvest * dividendPerShare;
-        const dividendsNoReinvest = sharesNoReinvest * dividendPerShare;
-
         const totalToBuyReinvest = monthlyDep + dividendsReinvest;
         const newSharesReinvest = totalToBuyReinvest / currentPrice;
         sharesReinvest += newSharesReinvest;
+        const endValueReinvest = sharesReinvest * currentPrice;
 
+        const startValueNoReinvest = sharesNoReinvest * currentPrice;
+        const dividendsNoReinvest = sharesNoReinvest * dividendPerShare;
         const newSharesNoReinvest = monthlyDep / currentPrice;
         sharesNoReinvest += newSharesNoReinvest;
         totalDividendsWithdrawn += dividendsNoReinvest;
-
-        const endValueReinvest = sharesReinvest * currentPrice;
         const endValueNoReinvest = sharesNoReinvest * currentPrice;
 
         simulationTable.push({
